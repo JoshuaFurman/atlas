@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/jroimartin/gocui"
@@ -15,6 +16,9 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		v.Title = "Models"
+		v.Clear()
+		fmt.Fprintln(v, "GPT-4")
+		fmt.Fprintln(v, "Claude-3")
 	}
 
 	// Left column "Conversations" view (below "Models").
@@ -39,7 +43,8 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		v.Title = "Command"
-		v.Autoscroll = true
+		// v.Frame = false
+		// v.Autoscroll = true
 	}
 	return nil
 }
