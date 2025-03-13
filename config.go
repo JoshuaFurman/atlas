@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,159 +8,95 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Model represents an AI model configuration
-type Model struct {
-	Name        string  `yaml:"name"`
-	Temperature float64 `yaml:"temperature"`
+// ModelConfig represents the configuration for a specific language model
+type ModelConfig struct {
+	Name         string `yaml:"name"`
+	Temperature  string `yaml:"temp"`
+	SystemPrompt string `yaml:"system_prompt"`
 }
 
-// Provider represents a provider configuration
-type Provider struct {
-	Endpoint string  `yaml:"endpoint"`
-	APIKey   string  `yaml:"api_key"`
-	Models   []Model `yaml:"models"`
+// ProviderConfig represents the configuration for an AI provider
+type ProviderConfig struct {
+	Endpoint string        `yaml:"endpoint"`
+	APIKey   string        `yaml:"api_key"`
+	Models   []ModelConfig `yaml:"models"`
 }
 
-// Config represents the application configuration
+// Config represents the root configuration structure with dynamic provider names
 type Config struct {
-	Providers map[string]Provider `yaml:",inline"`
+	ActiveProvider string
+	ActiveModel    string
+	Providers      map[string]ProviderConfig `yaml:",inline"`
 }
 
-// LoadConfig reads configuration from the specified file path
-func LoadConfig(configPath string) (*Config, error) {
-	data, err := os.ReadFile(configPath)
+// LoadConfig loads the configuration from the default path
+func LoadConfig() (*Config, error) {
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return nil, fmt.Errorf("error reading config file: %w", err)
+		return nil, fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	configPath := filepath.Join(homeDir, ".config", "atlas", "config.yml")
+	return LoadConfigFromPath(configPath)
+}
+
+// LoadConfigFromPath loads the configuration from a specific path
+func LoadConfigFromPath(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
 	}
 
 	var config Config
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing config file: %w", err)
+	// Initialize the providers map
+	config.Providers = make(map[string]ProviderConfig)
+
+	if err := yaml.Unmarshal(data, &config.Providers); err != nil {
+		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
 	return &config, nil
 }
 
-// DefaultConfigPath returns the default path to the config file
-func DefaultConfigPath() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to determine user home directory: %w", err)
+// GetAllProviders returns a list of all provider names
+func (c *Config) GetAllProviders() []string {
+	providers := make([]string, 0, len(c.Providers))
+	for name := range c.Providers {
+		providers = append(providers, name)
 	}
-
-	configDir := filepath.Join(homeDir, ".config", "atlas")
-	configPath := filepath.Join(configDir, "config.yml")
-
-	return configPath, nil
+	return providers
 }
 
-// LoadDefaultConfig attempts to load the configuration from the default path
-func LoadDefaultConfig() (*Config, error) {
-	configPath, err := DefaultConfigPath()
-	if err != nil {
-		return nil, err
-	}
-
-	return LoadConfig(configPath)
-}
-
-// EnsureConfigExists checks if the config file exists, and creates a default one if it doesn't
-func EnsureConfigExists() error {
-	configPath, err := DefaultConfigPath()
-	if err != nil {
-		return err
-	}
-
-	// Check if config file exists
-	_, err = os.Stat(configPath)
-	if err == nil {
-		// File exists, nothing to do
-		return nil
-	}
-
-	if !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("error checking config file: %w", err)
-	}
-
-	// Config directory
-	configDir := filepath.Dir(configPath)
-
-	// Create directory if it doesn't exist
-	err = os.MkdirAll(configDir, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
-	}
-
-	// Create a default config
-	defaultConfig := Config{
-		Providers: map[string]Provider{
-			"example-provider": {
-				Endpoint: "https://api.example.com/v1",
-				APIKey:   "YOUR_API_KEY_HERE",
-				Models: []Model{
-					{
-						Name:        "default-model",
-						Temperature: 0.7,
-					},
-				},
-			},
-		},
-	}
-
-	// Marshal to YAML
-	data, err := yaml.Marshal(defaultConfig)
-	if err != nil {
-		return fmt.Errorf("error creating default config: %w", err)
-	}
-
-	// Write the default config file
-	err = os.WriteFile(configPath, data, 0600) // Secure permissions since it may contain API keys
-	if err != nil {
-		return fmt.Errorf("error writing default config file: %w", err)
-	}
-
-	return nil
-}
-
-// GetProvider returns a provider configuration by name
-func (c *Config) GetProvider(name string) (Provider, error) {
-	provider, exists := c.Providers[name]
+// GetModelConfig retrieves a model config by provider and model name
+func (c *Config) GetModelConfig(provider, modelName string) (*ModelConfig, error) {
+	providerConfig, exists := c.Providers[provider]
 	if !exists {
-		return Provider{}, fmt.Errorf("provider '%s' not found in configuration", name)
+		return nil, fmt.Errorf("provider not found: %s", provider)
 	}
-	return provider, nil
+
+	for _, model := range providerConfig.Models {
+		if model.Name == modelName {
+			return &model, nil
+		}
+	}
+
+	return nil, fmt.Errorf("model %s not found for provider %s", modelName, provider)
 }
 
-// SaveConfig saves the current configuration to the specified file path
-func (c *Config) SaveConfig(configPath string) error {
-	data, err := yaml.Marshal(c)
-	if err != nil {
-		return fmt.Errorf("error marshaling config: %w", err)
+// GetProviderConfig retrieves a provider's configuration by name
+func (c *Config) GetProviderConfig(provider string) (*ProviderConfig, error) {
+	providerConfig, exists := c.Providers[provider]
+	if !exists {
+		return nil, fmt.Errorf("provider not found: %s", provider)
 	}
-
-	err = os.WriteFile(configPath, data, 0600) // Secure permissions for API keys
-	if err != nil {
-		return fmt.Errorf("error writing config file: %w", err)
-	}
-
-	return nil
+	return &providerConfig, nil
 }
 
-// SaveDefaultConfig saves the configuration to the default path
-func (c *Config) SaveDefaultConfig() error {
-	configPath, err := DefaultConfigPath()
-	if err != nil {
-		return err
+// GetModelsForProvider returns all models for a given provider
+func (c *Config) GetModelsForProvider(provider string) ([]ModelConfig, error) {
+	providerConfig, exists := c.Providers[provider]
+	if !exists {
+		return nil, fmt.Errorf("provider not found: %s", provider)
 	}
-
-	return c.SaveConfig(configPath)
-}
-
-// AddProvider adds or updates a provider in the configuration
-func (c *Config) AddProvider(name string, provider Provider) {
-	if c.Providers == nil {
-		c.Providers = make(map[string]Provider)
-	}
-	c.Providers[name] = provider
+	return providerConfig.Models, nil
 }
