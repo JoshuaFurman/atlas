@@ -88,7 +88,44 @@ func keybindings(g *gocui.Gui) error {
 	}
 
 	err = g.SetKeybinding("", '1', gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
-		_, err := g.SetViewOnTop("conversations")
+		_, err := setCurrentViewOnTop(g, "providers")
+		g.Cursor = false
+		return err
+	})
+	if err != nil {
+		return err
+	}
+
+	err = g.SetKeybinding("", '2', gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
+		_, err := setCurrentViewOnTop(g, "models")
+		g.Cursor = false
+		return err
+	})
+	if err != nil {
+		return err
+	}
+
+	err = g.SetKeybinding("", '3', gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
+		_, err := setCurrentViewOnTop(g, "conversations")
+		g.Cursor = false
+		return err
+	})
+	if err != nil {
+		return err
+	}
+
+	err = g.SetKeybinding("", '4', gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
+		_, err := setCurrentViewOnTop(g, "chatLog")
+		g.Cursor = false
+		return err
+	})
+	if err != nil {
+		return err
+	}
+
+	err = g.SetKeybinding("", '5', gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
+		_, err := setCurrentViewOnTop(g, "input")
+		g.Cursor = true
 		return err
 	})
 	if err != nil {
@@ -115,7 +152,7 @@ func layout(g *gocui.Gui) error {
 		config.ActiveProvider = "openai" // will eventually pull from some file that save active config
 		config.ActiveModel = "gpt-4o"    // will eventually pull from some file that save active config
 
-		v.Title = "Providers"
+		v.Title = "[1]-Providers"
 		v.Clear()
 
 		// providers := config.GetAllProviders()
@@ -134,16 +171,16 @@ func layout(g *gocui.Gui) error {
 		// 		}
 		// 	}
 		// }
-		if _, err = setCurrentViewOnTop(g, "providers"); err != nil {
-			return err
-		}
+		// if _, err = setCurrentViewOnTop(g, "providers"); err != nil {
+		// 	return err
+		// }
 	}
 
 	if v, err := g.SetView("models", maxX/8, 0, maxX/4-1, 10); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		v.Title = "Models"
+		v.Title = "[2]-Models"
 		v.Clear()
 	}
 
@@ -152,7 +189,7 @@ func layout(g *gocui.Gui) error {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		v.Title = "Conversations"
+		v.Title = "[3]-Conversations"
 	}
 
 	// Right-side "Chat Log" view.
@@ -160,7 +197,7 @@ func layout(g *gocui.Gui) error {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		v.Title = "Chat Log"
+		v.Title = "[4]-Chat Log"
 	}
 
 	// Input box for Chat Log view
@@ -168,9 +205,14 @@ func layout(g *gocui.Gui) error {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		v.Title = "Input"
+		v.Title = "[5]-Input"
 		v.Editable = true
 		v.Wrap = true
+
+		if _, err = setCurrentViewOnTop(g, "input"); err != nil {
+			return err
+		}
+
 	}
 
 	// Bottom "commandBar" view (spanning the full width).
