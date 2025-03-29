@@ -9,10 +9,80 @@ import (
 
 // var config Config
 
+var (
+	viewArr = []string{"providers", "models", "conversations", "chatLog", "input"}
+	active  = 0
+)
+
+func setCurrentViewOnTop(g *gocui.Gui, name string) (*gocui.View, error) {
+	if _, err := g.SetCurrentView(name); err != nil {
+		return nil, err
+	}
+	return g.SetViewOnTop(name)
+}
+
+// func handleEsc(g *gocui.Gui, v *gocui.View) error {
+// 	b := make([]byte, 2)
+// 	os.Stdin.Read(b)
+// 	if string(b) == "[Z" {
+// 		return prevView(g, v)
+// 	}
+// 	return nil
+// }
+//
+// func prevView(g *gocui.Gui, v *gocui.View) error {
+// 	nextIndex := active - 1
+// 	if nextIndex < 0 {
+// 		nextIndex = len(viewArr) - 1
+// 	}
+// 	name := viewArr[nextIndex]
+//
+// 	if _, err := setCurrentViewOnTop(g, name); err != nil {
+// 		return err
+// 	}
+//
+// 	if nextIndex == 4 {
+// 		g.Cursor = true
+// 	} else {
+// 		g.Cursor = false
+// 	}
+//
+// 	active = nextIndex
+// 	return nil
+// }
+
+func nextView(g *gocui.Gui, v *gocui.View) error {
+	nextIndex := (active + 1) % len(viewArr)
+	name := viewArr[nextIndex]
+
+	if _, err := setCurrentViewOnTop(g, name); err != nil {
+		return err
+	}
+
+	if nextIndex == 4 {
+		g.Cursor = true
+	} else {
+		g.Cursor = false
+	}
+
+	active = nextIndex
+	return nil
+}
+
 func keybindings(g *gocui.Gui) error {
 	err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
 		return gocui.ErrQuit
 	})
+	if err != nil {
+		return err
+	}
+
+	// err = g.SetKeybinding("", gocui.KeyEsc, gocui.ModNone, handleEsc)
+	// if err != nil {
+	// 	return err
+	// }
+
+	err = g.SetKeybinding("", gocui.KeyTab, gocui.ModNone, nextView)
 	if err != nil {
 		return err
 	}
@@ -32,7 +102,7 @@ func layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
 
 	// Top-left "Models" view (fixed height).
-	if v, err := g.SetView("providers", 0, 0, maxX/4-4, 10); err != nil {
+	if v, err := g.SetView("providers", 0, 0, maxX/8-1, 10); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
@@ -64,7 +134,9 @@ func layout(g *gocui.Gui) error {
 		// 		}
 		// 	}
 		// }
-
+		if _, err = setCurrentViewOnTop(g, "providers"); err != nil {
+			return err
+		}
 	}
 
 	if v, err := g.SetView("models", maxX/8, 0, maxX/4-1, 10); err != nil {
@@ -127,6 +199,7 @@ func main() {
 	g.Highlight = true
 	g.Cursor = true
 	g.SelFgColor = gocui.ColorGreen
+	g.InputEsc = true
 
 	g.SetManagerFunc(layout)
 
