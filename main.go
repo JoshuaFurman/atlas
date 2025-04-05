@@ -15,8 +15,11 @@ var (
 
 	// List of available providers
 	providers        []string
+	models           []ModelConfig
 	selectedProvider = 0 // Index of the currently selected provider
 	activeProvider   = 0 // Index of the active (confirmed) provider
+	selectedModel    = 0 // Index of the currently selected model
+	activeModel      = 0 // Index of the active (confirmed) model
 	config           *Config
 )
 
@@ -63,10 +66,80 @@ func moveProviderDown(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+// Navigate up in the models list
+func moveModelUp(g *gocui.Gui, v *gocui.View) error {
+	if selectedModel > 0 {
+		selectedModel--
+		updateModelsView(g)
+	}
+	return nil
+}
+
+// Navigate down in the models list
+func moveModelDown(g *gocui.Gui, v *gocui.View) error {
+	if selectedModel < len(models)-1 {
+		selectedModel++
+		updateModelsView(g)
+	}
+	return nil
+}
+
+// Select the currently highlighted model as the active model
+func selectModel(g *gocui.Gui, v *gocui.View) error {
+	activeModel = selectedModel
+	updateModelsView(g)
+
+	// Here you would typically update your configuration or application state
+	// to use the newly selected model
+
+	return nil
+}
+
+// Update the models view with the current selection
+func updateModelsView(g *gocui.Gui) error {
+	v, err := g.View("models")
+	if err != nil {
+		return err
+	}
+
+	v.Clear()
+
+	// Display the list of models with the selected one in green
+	// and the active one with an asterisk
+	for i, model := range models {
+		prefix := "  " // Default prefix (two spaces)
+		if i == activeModel {
+			prefix = "* " // Asterisk for active model
+		}
+
+		if i == selectedModel {
+			fmt.Fprintf(v, "\033[32m%s%s\033[0m\n", prefix, model.Name) // Green color for selected
+		} else {
+			fmt.Fprintf(v, "%s%s\n", prefix, model.Name)
+		}
+	}
+
+	// Update the active model in the config
+	// This would normally update your config, but for now we'll just display it
+	fmt.Fprintf(v, "\033[32m\n\nACTIVE:\n%s -> %s\033[0m", providers[activeProvider], models[activeModel].Name)
+
+	return nil
+}
+
 // Select the currently highlighted provider as the active provider
 func selectProvider(g *gocui.Gui, v *gocui.View) error {
 	activeProvider = selectedProvider
+	// Get models for the selected provider from config
+	var err error
+	models, err = config.GetModelsForProvider(providers[activeProvider])
+	if err != nil {
+		log.Fatalf("Failed to get models: %v", err)
+	}
+	selectedModel = 0
+	activeModel = 0
+
 	updateProvidersView(g)
+	updateModelsView(g)
 
 	// Here you would typically update your configuration or application state
 	// to use the newly selected provider
@@ -100,7 +173,7 @@ func updateProvidersView(g *gocui.Gui) error {
 
 	// Update the active provider in the config
 	// This would normally update your config, but for now we'll just display it
-	fmt.Fprintf(v, "\n%s -> %s", providers[activeProvider], "gpt-4o")
+	fmt.Fprintf(v, "\033[32m\n\nACTIVE:\n%s -> %s\033[0m", providers[activeProvider], models[activeModel].Name)
 
 	return nil
 }
@@ -109,6 +182,34 @@ func keybindings(g *gocui.Gui) error {
 	err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
 		return gocui.ErrQuit
 	})
+	if err != nil {
+		return err
+	}
+
+	// Arrow keys for navigating the models list when models view is active
+	err = g.SetKeybinding("models", gocui.KeyArrowUp, gocui.ModNone, moveModelUp)
+	if err != nil {
+		return err
+	}
+
+	err = g.SetKeybinding("models", gocui.KeyArrowDown, gocui.ModNone, moveModelDown)
+	if err != nil {
+		return err
+	}
+
+	// Add vim-style navigation with 'j' and 'k' keys for models
+	err = g.SetKeybinding("models", 'k', gocui.ModNone, moveModelUp)
+	if err != nil {
+		return err
+	}
+
+	err = g.SetKeybinding("models", 'j', gocui.ModNone, moveModelDown)
+	if err != nil {
+		return err
+	}
+
+	// Add Enter key binding to select the current model
+	err = g.SetKeybinding("models", gocui.KeyEnter, gocui.ModNone, selectModel)
 	if err != nil {
 		return err
 	}
@@ -198,21 +299,13 @@ func keybindings(g *gocui.Gui) error {
 func layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
 
+	///////////////////////// VIEWS BEGIN
+
 	// Top-left "Providers" view (fixed height).
 	if v, err := g.SetView("providers", 0, 0, maxX/8-1, 10); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-
-		// Load config from default path
-		// var err error
-		config, err = LoadConfig()
-		if err != nil {
-			log.Fatalf("Failed to load config: %v", err)
-		}
-
-		// Get providers from config
-		providers = config.GetAllProviders()
 
 		v.Title = "[1]-Providers"
 		v.SelBgColor = gocui.ColorBlack
@@ -227,7 +320,10 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		v.Title = "[2]-Models"
-		v.Clear()
+		v.SelBgColor = gocui.ColorBlack
+		v.SelFgColor = gocui.ColorGreen
+
+		updateModelsView(g)
 	}
 
 	// Left column "Conversations" view (below "Models").
@@ -258,7 +354,6 @@ func layout(g *gocui.Gui) error {
 		if _, err = setCurrentViewOnTop(g, "input"); err != nil {
 			return err
 		}
-
 	}
 
 	// Bottom "commandBar" view (spanning the full width).
@@ -267,8 +362,6 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		v.Title = "Command"
-		// v.Frame = false
-		// v.Autoscroll = true
 	}
 	return nil
 }
@@ -278,6 +371,24 @@ func layout(g *gocui.Gui) error {
 // }
 
 func main() {
+	// Load config from default path
+	var err error
+	config, err = LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Get providers from config
+	providers = config.GetAllProviders()
+
+	// Get models for the selected provider from config
+	models, err = config.GetModelsForProvider(providers[selectedProvider])
+	if err != nil {
+		log.Fatalf("Failed to get models: %v", err)
+	}
+
+	active = 4 // sets active pane to input view
+
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
 		log.Panicln(err)
