@@ -48,6 +48,24 @@ func nextView(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+// Process the input text when Enter is pressed
+func processInput(g *gocui.Gui, v *gocui.View) error {
+	inputText := v.Buffer()
+	// Do something with the inputText
+	fmt.Println("Processing input:", inputText)
+
+	// Clear the input view after processing
+	v.Clear()
+	v.SetCursor(0, 0)
+	return nil
+}
+
+// Insert a new line in the input view when alt+Enter is pressed
+func insertNewLine(g *gocui.Gui, v *gocui.View) error {
+	v.EditNewLine()
+	return nil
+}
+
 // Navigate up in the providers list
 func moveProviderUp(g *gocui.Gui, v *gocui.View) error {
 	if selectedProvider > 0 {
@@ -242,6 +260,18 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
+	// Add Enter key binding to process input text
+	err = g.SetKeybinding("input", gocui.KeyEnter, gocui.ModNone, processInput)
+	if err != nil {
+		return err
+	}
+
+	// Add Shift+Enter key binding to insert a new line
+	err = g.SetKeybinding("input", gocui.KeyEnter, gocui.ModAlt, insertNewLine)
+	if err != nil {
+		return err
+	}
+
 	err = g.SetKeybinding("", '1', gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
 		_, err := setCurrentViewOnTop(g, "providers")
 		g.Cursor = false
@@ -398,7 +428,6 @@ func main() {
 	g.Highlight = true
 	g.Cursor = true
 	g.SelFgColor = gocui.ColorGreen
-	g.InputEsc = true
 
 	g.SetManagerFunc(layout)
 
