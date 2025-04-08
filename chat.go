@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/alecthomas/chroma"
 	"github.com/alecthomas/chroma/formatters"
@@ -101,6 +102,11 @@ func processChar(char rune, state *int, buffer *string, code *string, lang *stri
 			*code += "``" + string(char)
 		}
 	}
+}
+
+// contains checks if a given string is in the array
+func contains(array []string, target string) bool {
+	return slices.Contains(array, target)
 }
 
 // Get prompt and validate
