@@ -51,7 +51,11 @@ func processInput(g *gocui.Gui, v *gocui.View) error {
 	v.Clear()
 	v.SetCursor(0, 0)
 
-	client := openai.NewClient("")
+	providerApi, err := config.GetProviderConfig(providers[activeProvider])
+	if err != nil {
+		log.Fatalf("couldnt get api-key: %v\n", err)
+	}
+	client := openai.NewClient(providerApi.APIKey)
 	context := context.Background()
 	currentChat = slices.Insert(currentChat, len(currentChat), openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleUser,
