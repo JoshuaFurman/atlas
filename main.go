@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 
 	"github.com/jroimartin/gocui"
@@ -22,7 +23,7 @@ var (
 	selectedModel    = 0 // Index of the currently selected model
 	activeModel      = 0 // Index of the active (confirmed) model
 	config           *Config
-	chatInfo         *Chat
+	currentChat      []openai.ChatCompletionMessage
 )
 
 // Process the input text when Enter is pressed
@@ -52,22 +53,16 @@ func processInput(g *gocui.Gui, v *gocui.View) error {
 
 	client := openai.NewClient("")
 	context := context.Background()
+	currentChat = slices.Insert(currentChat, len(currentChat), openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleUser,
+		Content: inputText,
+	})
 
 	go func() {
-		// time.Sleep(500 * time.Millisecond) // Simulate thinking time
 		request := openai.ChatCompletionRequest{
 			Model:       models[activeModel].Name,
 			Temperature: models[activeModel].Temperature,
-			Messages: []openai.ChatCompletionMessage{
-				{
-					Role:    openai.ChatMessageRoleSystem,
-					Content: models[activeModel].SystemPrompt,
-				},
-				{
-					Role:    openai.ChatMessageRoleUser,
-					Content: inputText,
-				},
-			},
+			Messages:    currentChat,
 		}
 		response, err := client.CreateChatCompletion(context, request)
 		if err != nil {
@@ -96,10 +91,7 @@ func addUserMessage(v *gocui.View, message string) {
 
 	// Print the formatted message lines (right-aligned)
 	for _, line := range strings.Split(formattedMsg, "\n") {
-		padding := width - len(line) - 2
-		if padding < 0 {
-			padding = 0
-		}
+		padding := max(width-len(line)-2, 0)
 		fmt.Fprintf(v, "%s\033[32m%s\033[0m\n", strings.Repeat(" ", padding), line)
 	}
 
@@ -134,7 +126,7 @@ func formatMessage(message string, maxWidth int, isUser bool) string {
 	}
 
 	// Add a prefix to indicate who's speaking
-	prefix := "AI: "
+	prefix := models[activeModel].Name + ": "
 	if isUser {
 		prefix = "You: "
 	}
@@ -163,20 +155,6 @@ func formatMessage(message string, maxWidth int, isUser bool) string {
 	}
 
 	return strings.Join(lines, "\n")
-}
-
-// Generate a mock response based on the user input
-func generateResponse(input string) string {
-	// For now, just echo back a simple response
-	responses := []string{
-		"I understand you're saying: " + input,
-		"That's an interesting point about: " + input,
-		"Let me think about: " + input,
-		"I'm processing your message: " + input,
-		"Thanks for sharing your thoughts on: " + input,
-	}
-
-	return responses[0]
 }
 
 // Insert a new line in the input view when alt+Enter is pressed
@@ -264,18 +242,22 @@ func main() {
 		log.Fatalf("Failed to get models: %v", err)
 	}
 
+	// ensures that openai is always the first selected provider
+	for i, provider := range providers {
+		if provider == "openai" {
+			activeProvider = i
+		}
+	}
 	config.ActiveProvider = providers[activeProvider]
 	config.ActiveModel = models[activeModel].Name
 	active = 4 // sets active pane to input view
 
-	// currentProvider, err := config.GetProviderConfig(config.ActiveProvider)
-	// if err != nil {
-	// 	log.Fatalf("Failed to get provider: %v", err)
-	// }
-
-	// initiate chat struct
-	// chatInfo.context = context.Background()
-	// chatInfo.client = openai.NewClient(currentProvider.APIKey)
+	// setup initial currentChat
+	currentChat = slices.Insert(currentChat, len(currentChat), openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleSystem,
+		Content: models[activeModel].SystemPrompt,
+	},
+	)
 
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
@@ -285,6 +267,7 @@ func main() {
 
 	g.Highlight = true
 	g.Cursor = true
+	g.Mouse = true
 	g.SelFgColor = gocui.ColorGreen
 
 	g.SetManagerFunc(layout)
