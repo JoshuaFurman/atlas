@@ -71,9 +71,7 @@ func moveModelDown(g *gocui.Gui, v *gocui.View) error {
 func selectModel(g *gocui.Gui, v *gocui.View) error {
 	activeModel = selectedModel
 	updateModelsView(g)
-
-	// Here you would typically update your configuration or application state
-	// to use the newly selected model
+	config.ActiveModel = models[activeModel].Name
 
 	return nil
 }
@@ -92,9 +90,7 @@ func selectProvider(g *gocui.Gui, v *gocui.View) error {
 
 	updateProvidersView(g)
 	updateModelsView(g)
-
-	// Here you would typically update your configuration or application state
-	// to use the newly selected provider
+	config.ActiveProvider = providers[activeProvider]
 
 	return nil
 }

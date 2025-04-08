@@ -1,12 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/jroimartin/gocui"
+	"github.com/sashabaranov/go-openai"
 )
 
 var (
@@ -21,6 +22,7 @@ var (
 	selectedModel    = 0 // Index of the currently selected model
 	activeModel      = 0 // Index of the active (confirmed) model
 	config           *Config
+	chatInfo         *Chat
 )
 
 // Process the input text when Enter is pressed
@@ -28,7 +30,7 @@ func processInput(g *gocui.Gui, v *gocui.View) error {
 	inputText := v.Buffer()
 
 	// Trim the input text to remove trailing newline
-	inputText = strings.TrimSpace(inputText)
+	// inputText = strings.TrimSpace(inputText)
 
 	// Skip empty messages
 	if inputText == "" {
@@ -41,9 +43,6 @@ func processInput(g *gocui.Gui, v *gocui.View) error {
 		return err
 	}
 
-	// Get the width of the chatLog view
-	// _, maxY := chatLogView.Size()
-
 	// Format user message (right-aligned with padding)
 	addUserMessage(chatLogView, inputText)
 
@@ -51,15 +50,33 @@ func processInput(g *gocui.Gui, v *gocui.View) error {
 	v.Clear()
 	v.SetCursor(0, 0)
 
-	// Simulate an AI response after a short delay
-	go func() {
-		time.Sleep(500 * time.Millisecond) // Simulate thinking time
-		g.Update(func(g *gocui.Gui) error {
-			// Generate a mock response
-			response := generateResponse(inputText)
+	client := openai.NewClient("")
+	context := context.Background()
 
-			// Add the AI response to the chat log (left-aligned)
-			addAIResponse(chatLogView, response)
+	go func() {
+		// time.Sleep(500 * time.Millisecond) // Simulate thinking time
+		request := openai.ChatCompletionRequest{
+			Model:       models[activeModel].Name,
+			Temperature: models[activeModel].Temperature,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: models[activeModel].SystemPrompt,
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: inputText,
+				},
+			},
+		}
+		response, err := client.CreateChatCompletion(context, request)
+		if err != nil {
+			log.Fatalf("ChatCompletionStream error: %v\n", err)
+			return
+		}
+
+		g.Update(func(g *gocui.Gui) error {
+			addAIResponse(chatLogView, response.Choices[0].Message.Content)
 			return nil
 		})
 	}()
@@ -247,7 +264,18 @@ func main() {
 		log.Fatalf("Failed to get models: %v", err)
 	}
 
+	config.ActiveProvider = providers[activeProvider]
+	config.ActiveModel = models[activeModel].Name
 	active = 4 // sets active pane to input view
+
+	// currentProvider, err := config.GetProviderConfig(config.ActiveProvider)
+	// if err != nil {
+	// 	log.Fatalf("Failed to get provider: %v", err)
+	// }
+
+	// initiate chat struct
+	// chatInfo.context = context.Background()
+	// chatInfo.client = openai.NewClient(currentProvider.APIKey)
 
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {

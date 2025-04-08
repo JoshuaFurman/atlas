@@ -10,9 +10,9 @@ import (
 
 // ModelConfig represents the configuration for a specific language model
 type ModelConfig struct {
-	Name         string `yaml:"name"`
-	Temperature  string `yaml:"temp"`
-	SystemPrompt string `yaml:"system_prompt"`
+	Name         string  `yaml:"name"`
+	Temperature  float32 `yaml:"temp"`
+	SystemPrompt string  `yaml:"system_prompt"`
 }
 
 // ProviderConfig represents the configuration for an AI provider
