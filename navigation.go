@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/jroimartin/gocui"
+	openai "github.com/sashabaranov/go-openai"
 )
 
 func setCurrentViewOnTop(g *gocui.Gui, name string) (*gocui.View, error) {
@@ -73,6 +74,28 @@ func selectModel(g *gocui.Gui, v *gocui.View) error {
 	updateModelsView(g)
 	config.ActiveModel = models[activeModel].Name
 
+	// reset and establish new chatlog
+	currentChat = currentChat[:0]
+	currentChat = append(currentChat, openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleSystem,
+		Content: models[activeModel].SystemPrompt,
+	},
+	)
+
+	chatLogView, err := g.View("chatLog")
+	if err != nil {
+		return err
+	}
+	chatLogView.Clear()
+	chatLogView.SetCursor(0, 0)
+
+	inputView, err := g.View("input")
+	if err != nil {
+		return err
+	}
+	inputView.Clear()
+	inputView.SetCursor(0, 0)
+
 	return nil
 }
 
@@ -91,6 +114,20 @@ func selectProvider(g *gocui.Gui, v *gocui.View) error {
 	updateProvidersView(g)
 	updateModelsView(g)
 	config.ActiveProvider = providers[activeProvider]
+
+	chatLogView, err := g.View("chatLog")
+	if err != nil {
+		return err
+	}
+	chatLogView.Clear()
+	chatLogView.SetCursor(0, 0)
+
+	inputView, err := g.View("input")
+	if err != nil {
+		return err
+	}
+	inputView.Clear()
+	inputView.SetCursor(0, 0)
 
 	return nil
 }

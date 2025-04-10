@@ -14,6 +14,7 @@ func layout(g *gocui.Gui) error {
 		v.Title = "[1]-Providers"
 		v.SelBgColor = gocui.ColorBlack
 		v.SelFgColor = gocui.ColorGreen
+		v.Wrap = true
 
 		// Initialize the providers view with the list of providers
 		updateProvidersView(g)
@@ -26,6 +27,7 @@ func layout(g *gocui.Gui) error {
 		v.Title = "[2]-Models"
 		v.SelBgColor = gocui.ColorBlack
 		v.SelFgColor = gocui.ColorGreen
+		v.Wrap = true
 
 		updateModelsView(g)
 	}

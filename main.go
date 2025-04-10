@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"slices"
 	"strings"
 
 	"github.com/jroimartin/gocui"
@@ -51,13 +50,21 @@ func processInput(g *gocui.Gui, v *gocui.View) error {
 	v.Clear()
 	v.SetCursor(0, 0)
 
-	providerApi, err := config.GetProviderConfig(providers[activeProvider])
+	currentProvider, err := config.GetProviderConfig(providers[activeProvider])
 	if err != nil {
 		log.Fatalf("couldnt get api-key: %v\n", err)
 	}
-	client := openai.NewClient(providerApi.APIKey)
+
+	var client *openai.Client
+	if providers[activeProvider] != "openai" {
+		clientConfig := openai.DefaultConfig(currentProvider.APIKey)
+		clientConfig.BaseURL = currentProvider.Endpoint
+		client = openai.NewClientWithConfig(clientConfig)
+	} else {
+		client = openai.NewClient(currentProvider.APIKey)
+	}
 	context := context.Background()
-	currentChat = slices.Insert(currentChat, len(currentChat), openai.ChatCompletionMessage{
+	currentChat = append(currentChat, openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleUser,
 		Content: inputText,
 	})
@@ -120,6 +127,12 @@ func addAIResponse(v *gocui.View, message string) {
 
 	// Auto-scroll to the bottom
 	v.Autoscroll = true
+
+	// add AI repsonse back to the chat history
+	currentChat = append(currentChat, openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleAssistant,
+		Content: message,
+	})
 }
 
 // Format a message with word wrapping
@@ -257,7 +270,7 @@ func main() {
 	active = 4 // sets active pane to input view
 
 	// setup initial currentChat
-	currentChat = slices.Insert(currentChat, len(currentChat), openai.ChatCompletionMessage{
+	currentChat = append(currentChat, openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleSystem,
 		Content: models[activeModel].SystemPrompt,
 	},
