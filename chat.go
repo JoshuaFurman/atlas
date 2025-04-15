@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"slices"
 
 	"github.com/alecthomas/chroma"
 	"github.com/alecthomas/chroma/formatters"
@@ -103,68 +102,3 @@ func processChar(char rune, state *int, buffer *string, code *string, lang *stri
 		}
 	}
 }
-
-// contains checks if a given string is in the array
-func contains(array []string, target string) bool {
-	return slices.Contains(array, target)
-}
-
-// Get prompt and validate
-// system_prompt := "You are a super powerful AI assistant. Answer all queries as concisely as possible and try to think through each response step-by-step."
-// prompt := os.Args[1]
-//
-// // Create GPT stream chat request
-// var c *openai.Client
-// if customUrl != "" {
-// 	config := openai.DefaultConfig(bearer)
-// 	config.BaseURL = customUrl
-// 	c = openai.NewClientWithConfig(config)
-// } else {
-// 	c = openai.NewClient(bearer)
-// }
-// ctx := context.Background()
-// req := openai.ChatCompletionRequest{
-// 	Model:       model,
-// 	MaxTokens:   maxTokens,
-// 	Temperature: float32(temperature),
-// 	Messages: []openai.ChatCompletionMessage{
-// 		{
-// 			Role:    openai.ChatMessageRoleSystem,
-// 			Content: system_prompt,
-// 		},
-// 		{
-// 			Role:    openai.ChatMessageRoleUser,
-// 			Content: prompt,
-// 		},
-// 	},
-// 	Stream: true,
-// }
-// stream, err := c.CreateChatCompletionStream(ctx, req)
-// if err != nil {
-// 	fmt.Printf("ChatCompletionStream error: %v\n", err)
-// 	return
-// }
-// defer stream.Close()
-//
-// state := 0
-// buffer := ""
-// code := ""
-// lang := ""
-//
-// fmt.Println()
-// for {
-// 	response, err := stream.Recv()
-// 	if errors.Is(err, io.EOF) {
-// 		fmt.Println() // For spacing of the response
-// 		return        // Finished displaying stream to terminal
-// 	}
-// 	if err != nil {
-// 		fmt.Printf("\nStream error: %v\n", err)
-// 		return
-// 	}
-//
-// 	for _, char := range response.Choices[0].Delta.Content {
-// 		processChar(char, &state, &buffer, &code, &lang)
-// 	}
-// }
-//

@@ -66,6 +66,34 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
+	// Arrow keys for navigating the convos list when convos view is active
+	err = g.SetKeybinding("convos", gocui.KeyArrowUp, gocui.ModNone, moveConvoUp)
+	if err != nil {
+		return err
+	}
+
+	err = g.SetKeybinding("convos", gocui.KeyArrowDown, gocui.ModNone, moveConvoDown)
+	if err != nil {
+		return err
+	}
+
+	// Add vim-style navigation with 'j' and 'k' keys for convos
+	err = g.SetKeybinding("convos", 'k', gocui.ModNone, moveConvoUp)
+	if err != nil {
+		return err
+	}
+
+	err = g.SetKeybinding("convos", 'j', gocui.ModNone, moveConvoDown)
+	if err != nil {
+		return err
+	}
+
+	// Add Enter key binding to select the current convo
+	err = g.SetKeybinding("convos", gocui.KeyEnter, gocui.ModNone, selectConvo)
+	if err != nil {
+		return err
+	}
+
 	// Add Enter key binding to process input text
 	err = g.SetKeybinding("input", gocui.KeyEnter, gocui.ModNone, processInput)
 	if err != nil {

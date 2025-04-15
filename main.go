@@ -17,20 +17,20 @@ var (
 	// List of available providers
 	providers        []string
 	models           []ModelConfig
+	conversations    []*Convos
 	selectedProvider = 0 // Index of the currently selected provider
 	activeProvider   = 0 // Index of the active (confirmed) provider
 	selectedModel    = 0 // Index of the currently selected model
 	activeModel      = 0 // Index of the active (confirmed) model
+	selectedConvo    = 0
+	activeConvo      = 0
 	config           *Config
-	currentChat      []openai.ChatCompletionMessage
+	currentConvo     *Convos
 )
 
 // Process the input text when Enter is pressed
 func processInput(g *gocui.Gui, v *gocui.View) error {
 	inputText := v.Buffer()
-
-	// Trim the input text to remove trailing newline
-	// inputText = strings.TrimSpace(inputText)
 
 	// Skip empty messages
 	if inputText == "" {
@@ -64,16 +64,13 @@ func processInput(g *gocui.Gui, v *gocui.View) error {
 		client = openai.NewClient(currentProvider.APIKey)
 	}
 	context := context.Background()
-	currentChat = append(currentChat, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleUser,
-		Content: inputText,
-	})
+	currentConvo.AddMessage(openai.ChatMessageRoleUser, inputText)
 
 	go func() {
 		request := openai.ChatCompletionRequest{
 			Model:       models[activeModel].Name,
 			Temperature: models[activeModel].Temperature,
-			Messages:    currentChat,
+			Messages:    currentConvo.ChatHistory,
 		}
 		response, err := client.CreateChatCompletion(context, request)
 		if err != nil {
@@ -128,11 +125,13 @@ func addAIResponse(v *gocui.View, message string) {
 	// Auto-scroll to the bottom
 	v.Autoscroll = true
 
-	// add AI repsonse back to the chat history
-	currentChat = append(currentChat, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleAssistant,
-		Content: message,
-	})
+	// add AI response back to the chat history
+	currentConvo.AddMessage(openai.ChatMessageRoleAssistant, message)
+
+	// Save the conversation after each AI response
+	if err := saveCurrentConversation(); err != nil {
+		log.Printf("Failed to save conversation: %v", err)
+	}
 }
 
 // Format a message with word wrapping
@@ -242,6 +241,84 @@ func updateProvidersView(g *gocui.Gui) error {
 	return nil
 }
 
+func updateConvosView(g *gocui.Gui) error {
+	v, err := g.View("conversations")
+	if err != nil {
+		return err
+	}
+
+	v.Clear()
+
+	// Display the list of conversations with the selected one in green
+	// and the active one with an asterisk
+	for i, convo := range conversations {
+		prefix := "  " // Default prefix (two spaces)
+		if i == activeConvo {
+			prefix = "* " // Asterisk for active conversation
+		}
+
+		title := convo.Title
+		if title == "" {
+			title = "Untitled"
+		}
+
+		if i == selectedConvo {
+			fmt.Fprintf(v, "\033[32m%s%s\033[0m\n", prefix, title) // Green color for selected
+		} else {
+			fmt.Fprintf(v, "%s%s\n", prefix, title)
+		}
+	}
+
+	return nil
+}
+
+// loadConversations loads all conversations for the given provider and model
+func loadConversations(provider, model string) {
+	var err error
+	conversations, err = ListConversations(provider, model)
+	if err != nil {
+		log.Printf("Failed to load conversations: %v", err)
+		conversations = []*Convos{}
+	}
+}
+
+// saveCurrentConversation saves the current conversation to a file
+func saveCurrentConversation() error {
+	if currentConvo == nil || len(currentConvo.ChatHistory) <= 1 {
+		// Don't save empty conversations (only system prompt)
+		return nil
+	}
+
+	return currentConvo.Save()
+}
+
+// loadConversation loads a conversation and makes it the current one
+func loadConversation(index int) {
+	if index < 0 || index >= len(conversations) {
+		return
+	}
+
+	currentConvo = conversations[index]
+	activeConvo = index
+}
+
+// createNewConversation creates a new conversation with the current provider and model
+func createNewConversation() {
+	// Save the current conversation first
+	if currentConvo != nil && len(currentConvo.ChatHistory) > 1 {
+		if err := currentConvo.Save(); err != nil {
+			log.Printf("Failed to save current conversation: %v", err)
+		}
+	}
+
+	// Create a new conversation
+	currentConvo = NewConvos("New Chat", providers[activeProvider], models[activeModel].Name)
+	currentConvo.AddMessage(openai.ChatMessageRoleSystem, models[activeModel].SystemPrompt)
+
+	// Reload conversations to include the new one
+	loadConversations(providers[activeProvider], models[activeModel].Name)
+}
+
 func main() {
 	// Load config from default path
 	var err error
@@ -269,12 +346,14 @@ func main() {
 	config.ActiveModel = models[activeModel].Name
 	active = 4 // sets active pane to input view
 
-	// setup initial currentChat
-	currentChat = append(currentChat, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleSystem,
-		Content: models[activeModel].SystemPrompt,
-	},
-	)
+	// Create a new conversation with the current provider and model
+	currentConvo = NewConvos("New Chat", providers[activeProvider], models[activeModel].Name)
+
+	// Add the system prompt as the first message
+	currentConvo.AddMessage(openai.ChatMessageRoleSystem, models[activeModel].SystemPrompt)
+
+	// Load existing conversations for the current provider and model
+	loadConversations(providers[activeProvider], models[activeModel].Name)
 
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {

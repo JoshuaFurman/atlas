@@ -68,19 +68,44 @@ func moveModelDown(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+// Navigate up in the convos list
+func moveConvoUp(g *gocui.Gui, v *gocui.View) error {
+	if selectedConvo > 0 {
+		selectedConvo--
+		updateConvosView(g)
+	}
+	return nil
+}
+
+// Navigate down in the conversations list
+func moveConvoDown(g *gocui.Gui, v *gocui.View) error {
+	if selectedConvo < len(conversations)-1 {
+		selectedConvo++
+		updateConvosView(g)
+	}
+	return nil
+}
+
 // Select the currently highlighted model as the active model
 func selectModel(g *gocui.Gui, v *gocui.View) error {
 	activeModel = selectedModel
 	updateModelsView(g)
 	config.ActiveModel = models[activeModel].Name
 
-	// reset and establish new chatlog
-	currentChat = currentChat[:0]
-	currentChat = append(currentChat, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleSystem,
-		Content: models[activeModel].SystemPrompt,
-	},
-	)
+	// Save the current conversation first
+	if currentConvo != nil && len(currentConvo.ChatHistory) > 1 {
+		if err := currentConvo.Save(); err != nil {
+			log.Printf("Failed to save current conversation: %v", err)
+		}
+	}
+
+	// Create a new conversation with the selected model
+	currentConvo = NewConvos("New Chat", providers[activeProvider], models[activeModel].Name)
+	currentConvo.AddMessage(openai.ChatMessageRoleSystem, models[activeModel].SystemPrompt)
+
+	// Load conversations for the new provider/model combination
+	loadConversations(providers[activeProvider], models[activeModel].Name)
+	updateConvosView(g)
 
 	chatLogView, err := g.View("chatLog")
 	if err != nil {
@@ -115,6 +140,21 @@ func selectProvider(g *gocui.Gui, v *gocui.View) error {
 	updateModelsView(g)
 	config.ActiveProvider = providers[activeProvider]
 
+	// Save the current conversation first
+	if currentConvo != nil && len(currentConvo.ChatHistory) > 1 {
+		if err := currentConvo.Save(); err != nil {
+			log.Printf("Failed to save current conversation: %v", err)
+		}
+	}
+
+	// Create a new conversation with the selected provider and model
+	currentConvo = NewConvos("New Chat", providers[activeProvider], models[activeModel].Name)
+	currentConvo.AddMessage(openai.ChatMessageRoleSystem, models[activeModel].SystemPrompt)
+
+	// Load conversations for the new provider/model combination
+	loadConversations(providers[activeProvider], models[activeModel].Name)
+	updateConvosView(g)
+
 	chatLogView, err := g.View("chatLog")
 	if err != nil {
 		return err
@@ -128,6 +168,48 @@ func selectProvider(g *gocui.Gui, v *gocui.View) error {
 	}
 	inputView.Clear()
 	inputView.SetCursor(0, 0)
+
+	return nil
+}
+
+// Select the currently highlighted conversation as the active conversation
+func selectConvo(g *gocui.Gui, v *gocui.View) error {
+	if selectedConvo < 0 || selectedConvo >= len(conversations) {
+		return nil
+	}
+
+	// Save the current conversation first
+	if currentConvo != nil && len(currentConvo.ChatHistory) > 1 {
+		if err := currentConvo.Save(); err != nil {
+			log.Printf("Failed to save current conversation: %v", err)
+		}
+	}
+
+	// Load the selected conversation
+	loadConversation(selectedConvo)
+	updateConvosView(g)
+
+	// Update the chat log view with the conversation history
+	chatLogView, err := g.View("chatLog")
+	if err != nil {
+		return err
+	}
+	chatLogView.Clear()
+
+	// Display all messages except the system prompt
+	for i, msg := range currentConvo.ChatHistory {
+		if i == 0 && msg.Role == openai.ChatMessageRoleSystem {
+			// Skip system prompt
+			continue
+		}
+
+		switch msg.Role {
+		case openai.ChatMessageRoleUser:
+			addUserMessage(chatLogView, msg.Content)
+		case openai.ChatMessageRoleAssistant:
+			addAIResponse(chatLogView, msg.Content)
+		}
+	}
 
 	return nil
 }

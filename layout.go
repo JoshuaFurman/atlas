@@ -38,6 +38,8 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		v.Title = "[3]-Conversations"
+
+		updateConvosView(g)
 	}
 
 	// Right-side "Chat Log" view.
