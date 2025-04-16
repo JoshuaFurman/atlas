@@ -109,6 +109,7 @@ func keybindings(g *gocui.Gui) error {
 	err = g.SetKeybinding("", '1', gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
 		_, err := setCurrentViewOnTop(g, "providers")
 		g.Cursor = false
+		active = 0
 		return err
 	})
 	if err != nil {
@@ -118,6 +119,7 @@ func keybindings(g *gocui.Gui) error {
 	err = g.SetKeybinding("", '2', gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
 		_, err := setCurrentViewOnTop(g, "models")
 		g.Cursor = false
+		active = 1
 		return err
 	})
 	if err != nil {
@@ -127,6 +129,7 @@ func keybindings(g *gocui.Gui) error {
 	err = g.SetKeybinding("", '3', gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
 		_, err := setCurrentViewOnTop(g, "conversations")
 		g.Cursor = false
+		active = 2
 		return err
 	})
 	if err != nil {
@@ -136,6 +139,7 @@ func keybindings(g *gocui.Gui) error {
 	err = g.SetKeybinding("", '4', gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
 		_, err := setCurrentViewOnTop(g, "chatLog")
 		g.Cursor = false
+		active = 3
 		return err
 	})
 	if err != nil {
@@ -145,6 +149,7 @@ func keybindings(g *gocui.Gui) error {
 	err = g.SetKeybinding("", '5', gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
 		_, err := setCurrentViewOnTop(g, "input")
 		g.Cursor = true
+		active = 4
 		return err
 	})
 	if err != nil {

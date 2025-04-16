@@ -90,6 +90,7 @@ func moveConvoDown(g *gocui.Gui, v *gocui.View) error {
 func selectModel(g *gocui.Gui, v *gocui.View) error {
 	activeModel = selectedModel
 	updateModelsView(g)
+	updateProvidersView(g)
 	config.ActiveModel = models[activeModel].Name
 
 	// Save the current conversation first
