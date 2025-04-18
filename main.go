@@ -311,6 +311,8 @@ func createNewConversation() {
 		}
 	}
 
+	// TODO: add feature here to have the llm summarize the chat to give it a unique title
+
 	// Create a new conversation
 	currentConvo = NewConvos("New Chat", providers[activeProvider], models[activeModel].Name)
 	currentConvo.AddMessage(openai.ChatMessageRoleSystem, models[activeModel].SystemPrompt)
@@ -348,10 +350,8 @@ func main() {
 
 	// Create a new conversation with the current provider and model
 	currentConvo = NewConvos("New Chat", providers[activeProvider], models[activeModel].Name)
-
 	// Add the system prompt as the first message
 	currentConvo.AddMessage(openai.ChatMessageRoleSystem, models[activeModel].SystemPrompt)
-
 	// Load existing conversations for the current provider and model
 	loadConversations(providers[activeProvider], models[activeModel].Name)
 

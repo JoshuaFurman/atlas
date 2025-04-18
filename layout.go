@@ -38,6 +38,9 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		v.Title = "[3]-Conversations"
+		v.SelBgColor = gocui.ColorBlack
+		v.SelFgColor = gocui.ColorGreen
+		v.Autoscroll = true
 
 		updateConvosView(g)
 	}
@@ -48,6 +51,7 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		v.Title = "[4]-Chat Log"
+		v.Autoscroll = true
 	}
 
 	// Input box for Chat Log view
